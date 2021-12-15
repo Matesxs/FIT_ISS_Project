@@ -1,0 +1,14 @@
+.idea/
+.vscode/
+logs/
+*_dataset/
+venv/
+*.aux
+*.log
+*.fls
+*.toc
+*.pdf
+*.lof
+*.gz
+*.out
+*.fdb_latexmk
