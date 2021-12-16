@@ -12,3 +12,4 @@ venv/
 *.gz
 *.out
 *.fdb_latexmk
+*wav
