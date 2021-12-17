@@ -13,3 +13,6 @@ venv/
 *.out
 *.fdb_latexmk
 *wav
+*.h5
+best_weights/
+*.png
