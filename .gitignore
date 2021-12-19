@@ -16,3 +16,4 @@ venv/
 *.h5
 best_weights/
 *.png
+*.json
