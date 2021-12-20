@@ -250,7 +250,7 @@ def noiseToSignalLoss(y_true, y_pred):
 def SNR(y_true, y_pred):
   return -10.0 * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.0)
 
-def create_model(default_filter_size, number_of_layers, lr=1e-4):
+def create_model(default_filter_size, number_of_layers, double_layers=False, lr=1e-4):
   inp1 = layers.Input(shape=(FRAME_SIZE,1), name="frame_input")
   inp2 = layers.Input(shape=(FRAME_SIZE // 2,2), name="fft_input")
   inp3 = layers.Input(shape=(1,), name="frequency_input")
@@ -273,6 +273,12 @@ def create_model(default_filter_size, number_of_layers, lr=1e-4):
     if i == 0:
       x = layers.Dropout(0.1, name=f"down_dense_dropout_{i}")(x)
     first_stage_layers.append(x)
+
+    if double_layers:
+      x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"down_dense_{i}d")(x)
+      x = layers.LeakyReLU(0.2, name=f"down_dense_activation_{i}d")(x)
+      x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"down_dense_batchnorm_{i}d")(x)
+
     default_filter_size /= 2
 
   for i, layer in enumerate(reversed(first_stage_layers)):

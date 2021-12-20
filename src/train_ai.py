@@ -9,7 +9,7 @@ if __name__ == "__main__":
   print(len(train_data_generator))
   print(len(test_data_generator))
 
-  model = create_model(2048, 4, lr=1e-3)
+  model = create_model(4096, 3, lr=1e-3)
   model.summary()
   utils.plot_model(model, show_shapes=True, expand_nested=True)
 

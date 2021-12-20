@@ -5,9 +5,11 @@ import gc
 from tqdm import tqdm
 from pathlib import Path
 import soundfile as sf
+import math
 from pydub import AudioSegment
 import multiprocessing
 from functools import partial
+import os
 
 from helpers import *
 
@@ -58,13 +60,19 @@ def process_one_file(smpls, fs):
 
   return normalized_samples, noised_samples
 
-def move_file(src, dest):
-  name = Path(src).name
-  shutil.move(src, os.path.join(dest, name))
+def move_file(srcs, dest):
+  try:
+    for src in srcs:
+      os.rename(src, os.path.join(dest, Path(src).name))
+  except KeyboardInterrupt:
+    pass
 
 def move_files(file_paths, target_path):
-  with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-    p.map(partial(move_file, dest=target_path), file_paths)
+  try:
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+      p.map(partial(move_file, dest=target_path), [file_paths[(i * 100) : ((i * 100) + 100)] for i in range(math.ceil(len(file_paths) / 100))])
+  except KeyboardInterrupt:
+    pass
 
 if __name__ == "__main__":
   file_paths = []
