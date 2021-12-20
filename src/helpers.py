@@ -9,9 +9,27 @@ from tensorflow.keras import layers, optimizers, Model, callbacks, initializers
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import time
+import random
 import json
 
 from settings import *
+
+def create_frames(data:np.ndarray):
+  number_of_frames = data.size // frame_shift
+  frames = [data[idx * frame_shift : FRAME_SIZE + idx * frame_shift] for idx in range(number_of_frames)]
+  frames[len(frames) - 1] = np.pad(frames[len(frames) - 1], (0, FRAME_SIZE - frames[len(frames) - 1].shape[0]), "constant")
+  return frames
+
+def noise_data(data, fs):
+  sdata = data.copy()
+
+  length_in_secs = sdata.size / fs
+  time = np.linspace(0, length_in_secs, sdata.size, endpoint=False)
+
+  for _ in range(random.randint(1, MAXIMUM_NUMBER_OF_NOISE_CHANNELS)):
+    sdata += (random.random() * NOISE_APLITUDE_MAX) * np.cos(2 * np.pi * (random.random() * NOISE_FREQ_MAX) * time + (random.random() * 2 * np.pi))
+  
+  return sdata
 
 def find_files(files, dirs=[], extensions=[]):
     new_dirs = []
@@ -50,7 +68,7 @@ def data_generation(files, batch_size, dim):
   try:
     # Initialization
     X = np.empty((batch_size, *dim))
-    fft = np.empty((batch_size, dim[0], 2))
+    fft = np.empty((batch_size, dim[0] // 2, 2))
     f = np.empty((batch_size), dtype=float)
     y = np.empty((batch_size, *dim))
 
@@ -138,13 +156,14 @@ class DataGenerator(keras.utils.Sequence, threading.Thread):
         pass
 
 class BackupCallback(callbacks.Callback):
-  def __init__(self, backup_path, best_weights_path=None, monitor_value="val_loss", monitor_value_mode="min"):
+  def __init__(self, backup_path, best_weights_path=None, monitor_value="val_loss", monitor_value_mode="min", min_delta=0.0001):
     super(BackupCallback, self).__init__()
 
     self.backup_path = backup_path
     self.value_save_name = monitor_value
     self.value_mode = monitor_value_mode
     self.best_weights_path = best_weights_path
+    self.min_delta = min_delta
 
     setattr(self, monitor_value, np.Inf if monitor_value_mode == "min" else -np.Inf)
 
@@ -172,33 +191,34 @@ class BackupCallback(callbacks.Callback):
       }
 
       try:
-        value = logs.get(self.value_save_name)
-        attr = float(getattr(self, self.value_save_name))
+        if self.value_save_name is not None and self.value_mode is not None:
+          value = logs.get(self.value_save_name)
+          attr = float(getattr(self, self.value_save_name))
 
-        if self.value_mode == "min":
-          if value < attr:
-            setattr(self, self.value_save_name, value)
-            attr = value
+          if self.value_mode == "min":
+            if (value + self.min_delta) < attr:
+              setattr(self, self.value_save_name, value)
+              attr = value
 
-            print(f"\nNew record value of {self.value_save_name} reached {round(value, 4)}")
+              print(f"\nNew record value of {self.value_save_name} reached {round(value, 4)}")
 
-            if self.best_weights_path is not None:
-              model.save_weights(self.best_weights_path)
-          else:
-            print(f"\nValue of {self.value_save_name} is {round(value, 4)} that is higher than current record of {round(attr, 4)}")
-        elif self.value_mode == "max":
-          if value > attr:
-            setattr(self, self.value_save_name, value)
-            attr = value
+              if self.best_weights_path is not None:
+                model.save_weights(self.best_weights_path)
+            else:
+              print(f"\nValue of {self.value_save_name} is {round(value, 4)} that is higher than current record of {round(attr, 4)}")
+          elif self.value_mode == "max":
+            if (value - self.min_delta) > attr:
+              setattr(self, self.value_save_name, value)
+              attr = value
 
-            print(f"\nNew record value of {self.value_save_name} reached {round(value, 4)}")
+              print(f"\nNew record value of {self.value_save_name} reached {round(value, 4)}")
 
-            if self.best_weights_path is not None:
-              model.save_weights(self.best_weights_path)
-          else:
-            print(f"\nValue of {self.value_save_name} is {round(value, 4)} that is lower than current record of {round(attr, 4)}")
+              if self.best_weights_path is not None:
+                model.save_weights(self.best_weights_path)
+            else:
+              print(f"\nValue of {self.value_save_name} is {round(value, 4)} that is lower than current record of {round(attr, 4)}")
 
-        data[self.value_save_name] = attr
+          data[self.value_save_name] = attr
       except Exception as e:
         print(f"\n[ERROR] Some error when saving checkpoint record\n{e}")
 
@@ -232,7 +252,7 @@ def SNR(y_true, y_pred):
 
 def create_model(default_filter_size, number_of_layers, lr=1e-4):
   inp1 = layers.Input(shape=(FRAME_SIZE,1), name="frame_input")
-  inp2 = layers.Input(shape=(FRAME_SIZE,2), name="fft_input")
+  inp2 = layers.Input(shape=(FRAME_SIZE // 2,2), name="fft_input")
   inp3 = layers.Input(shape=(1,), name="frequency_input")
 
   x = layers.Concatenate(name="data_conc")([inp1, inp2])

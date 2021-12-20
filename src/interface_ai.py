@@ -41,7 +41,7 @@ if __name__ == "__main__":
     print("Path to model not found")
     exit(-1)
     
-  model = load_model(MODEL_PATH)
+  model = load_model(MODEL_PATH, custom_objects={"noiseToSignalLoss" : noiseToSignalLoss, "SNR" : SNR})
 
   samples_orig, sample_freq = sf.read("../audio/xdousa00.wav")
 
@@ -55,16 +55,15 @@ if __name__ == "__main__":
   plt.gca().set_ylabel('$Amplituda[-]$')
   plt.show()
 
-  cleared_signal = denoise(samples_normal, sample_freq)
-  norm_cleared_signal = normalization(cleared_signal)
+  cleared_signal = denoise(samples_normal, sample_freq, model)
 
-  print(norm_cleared_signal.shape)
+  print(cleared_signal.shape)
 
   plt.figure(figsize=(18,8))
   plt.title("Vyčištěný signál")
-  plt.plot(np.arange(norm_cleared_signal.size) / sample_freq, norm_cleared_signal)
+  plt.plot(np.arange(cleared_signal.size) / sample_freq, cleared_signal)
   plt.gca().set_xlabel('$t[s]$')
   plt.gca().set_ylabel('$Amplituda[-]$')
   plt.show()
 
-  wavfile.write("clean_test.wav", sample_freq, norm_cleared_signal)
+  wavfile.write("clean_test.wav", sample_freq, cleared_signal)

@@ -9,13 +9,13 @@ if __name__ == "__main__":
   print(len(train_data_generator))
   print(len(test_data_generator))
 
-  model = create_model(2048, 2, lr=1e-3)
+  model = create_model(2048, 4, lr=1e-3)
   model.summary()
   utils.plot_model(model, show_shapes=True, expand_nested=True)
 
   number_of_batches = len(train_data_generator) // STEPES_PER_EPOCH
   backup = BackupCallback("backup.json", best_weights_path="best_weights.h5", monitor_value="val_SNR", monitor_value_mode="max")
-  lr_scheduler = callbacks.ReduceLROnPlateau(monitor='val_SNR',patience=5,factor=0.5,verbose=1)
+  lr_scheduler = callbacks.ReduceLROnPlateau(monitor='val_SNR', mode="max",patience=5,factor=0.5,verbose=1)
   early_stop = callbacks.EarlyStopping(monitor="val_SNR", mode="max", patience=10)
 
   try:
@@ -39,4 +39,5 @@ if __name__ == "__main__":
   except Exception:
     pass
 
+  model.save_weights("checkpoint.h5")
   model.save("model.h5")
