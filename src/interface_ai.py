@@ -19,7 +19,7 @@ def denoise(sample, fs, model):
 
   frames = np.array(frames)
 
-  fft = np.array([convert_imag_to_parts(np.fft.fft(frame)) for frame in frames])
+  fft = np.array([convert_imag_to_parts(np.fft.fft(frame)[:(FRAME_SIZE//2)]) for frame in frames])
 
   output_frames = model.predict([frames, fft, np.ones((frames.shape[0], 1)) * fs])
 
