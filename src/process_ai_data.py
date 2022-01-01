@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print("Numbe of source files")
     print(len(file_paths))
 
-    for file_path in tqdm(file_paths):
+    for file_path in tqdm(file_paths, ncols=20):
       cleaned_name = Path(file_path).name[:-4]
 
       if (any([cleaned_name in file_name for file_name in already_used_filenames]) or

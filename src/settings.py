@@ -2,7 +2,7 @@ TRAIN_DATASET_PATH = r"..\\train_dataset"
 TEST_DATASET_PATH = r"..\\test_dataset"
 
 DATA_PATH = r"..\\data"
-VAL_SPLIT = 0.1
+VAL_SPLIT = 0.2
 
 FRAME_SIZE = 4096
 FRAME_OVERLAP = 2048

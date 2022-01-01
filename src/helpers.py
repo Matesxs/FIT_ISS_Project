@@ -17,6 +17,8 @@ from settings import *
 def create_frames(data:np.ndarray):
   number_of_frames = data.size // frame_shift
   frames = [data[idx * frame_shift : FRAME_SIZE + idx * frame_shift] for idx in range(number_of_frames)]
+
+  # Pad last frame if needed
   frames[len(frames) - 1] = np.pad(frames[len(frames) - 1], (0, FRAME_SIZE - frames[len(frames) - 1].shape[0]), "constant")
   return frames
 
@@ -62,13 +64,13 @@ def convert_imag_to_parts(array:np.ndarray):
         tmp[idx][0] = a.real
         tmp[idx][1] = a.imag
 
-    return np.nan_to_num(tmp)
+    return np.reshape(np.nan_to_num(tmp), (array.shape[0] * 2,))
 
 def data_generation(files, batch_size, dim):
   try:
     # Initialization
     X = np.empty((batch_size, *dim))
-    fft = np.empty((batch_size, dim[0] // 2, 2))
+    fft = np.empty((batch_size, *dim))
     f = np.empty((batch_size), dtype=float)
     y = np.empty((batch_size, *dim))
 
@@ -77,13 +79,14 @@ def data_generation(files, batch_size, dim):
         freq = float(file[:-4].split("_")[-1])
 
         try:
-            loaded_data = np.load(file)
+            loaded_data = np.load(file, allow_pickle=True)
 
             X[idx,] = loaded_data[1].real
             fft[idx,] = convert_imag_to_parts(loaded_data[2])
             f[idx] = freq / MAX_SAMPLE_FREQUENCY
             y[idx,] = loaded_data[0].real
         except Exception as e:
+            print(f"[WARNING] Failed to create new batch\n{e}")
             return None
 
     return [X, fft, f], y
@@ -227,9 +230,9 @@ class BackupCallback(callbacks.Callback):
     except Exception as e:
       print(f"\n[WARNING] Failed to save backup\n{e}")
 
-  def get_value(self, value_name):
+  def get_value(self):
     try:
-      return getattr(self, value_name)
+      return getattr(self, self.value_save_name)
     except:
       return None
 
@@ -251,12 +254,11 @@ def SNR(y_true, y_pred):
   return -10.0 * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.0)
 
 def create_model(default_filter_size, number_of_layers, double_layers=False, lr=1e-4):
-  inp1 = layers.Input(shape=(FRAME_SIZE,1), name="frame_input")
-  inp2 = layers.Input(shape=(FRAME_SIZE // 2,2), name="fft_input")
+  inp1 = layers.Input(shape=(FRAME_SIZE,), name="frame_input")
+  inp2 = layers.Input(shape=(FRAME_SIZE,), name="fft_input")
   inp3 = layers.Input(shape=(1,), name="frequency_input")
 
   x = layers.Concatenate(name="data_conc")([inp1, inp2])
-  x = layers.Flatten()(x)
 
   y = layers.Dense(64, name="freq_dense")(inp3)
   y = layers.LeakyReLU(0.2, name="freq_activation")(y)
@@ -289,6 +291,11 @@ def create_model(default_filter_size, number_of_layers, double_layers=False, lr=
     x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"up_dense_batchnorm_{i}")(x)
 
     x = layers.Add(name=f"skip_add_{i}")([x, layer])
+
+    if double_layers:
+      x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"down_dense_{i}u")(x)
+      x = layers.LeakyReLU(0.2, name=f"down_dense_activation_{i}u")(x)
+      x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"down_dense_batchnorm_{i}u")(x)
 
   x = layers.Dense(FRAME_SIZE, name="output")(x)
 
