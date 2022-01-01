@@ -1,6 +1,8 @@
 \section{Spektrogram}
 
-V této části se podíváme na frekvenční složení vstupního signálu.
+V této části se podíváme na frekvenční složení vstupního signálu. \\
+Byl zobrazen spektrogram celého signálu pomocí funkce spektrogram z knihovny scipy a také jeho výkonová spektrální hustota. Místo této funkce by šla použít přímo naše fourierova transformace u předchozího kroku použítá na každý frame, ale bylo by zbytečné ji použít když máme k dispozici přímo funkci, která nám vygeneruje rovnou data celého spektrogramu bez nutnosti dalších operací s daty na naší straně. Další výhodou bude rychlost zpracování, protože tato knihovna je velmi optimalizovaná narozdíl od naší implementace. \\
+Pro další krok - určení rušivých frekvencí, byl vytvořen i graf výkonové spektrální hustoty pro první frame signálu (pouze šum).
 
 \begin{figure}[H] 
 	\centering
