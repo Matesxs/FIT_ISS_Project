@@ -4,6 +4,12 @@ Před tím než začneme pracovat se signálem je hlavní tento signál normaliz
 Tato část je hlavně důležitá pokud chceme porovávat signály mezi sebou. Další důvod normalizace je pro využité některých algoritmů které neumí pracovat s daty co nejsou normalizované.
 Byl zobrazen znělý rámec, v našem případě rámec číslo 11 a jako zajímavost rámec kde je pouze šum a to rámec číslo 0.
 
+Byla vytvořena funkce na normalizování signálu, kde se jako první získá střední hodnota signálu pomocí np.mean. 
+Tato hodnota je potom odečtena od vzorků původního signálu.
+Potom je získána maximální absolutní amplituda signálu pomocí buildin funkcí "max" a "abs".
+Touto maximální absolutní hodnotou amplitudy jsou potom vyděleny vzorky signálu.
+Grafy signálů byli vytvořeny stejně jako graf původního signálu.
+
 \begin{figure}[H] 
 	\centering
 	\includegraphics[scale=0.35,keepaspectratio]{Figure_3}

@@ -1,7 +1,8 @@
 \section{Generování signálu}
 
-Byl vygenerován zvukový soubor obsahující pouze rušení složený z cosinusovek frekvencí, které jsme našli pomocí funkcí z knihovny numpy. Tento signál byl poté podroben spektrální analýze.
-Z výskedků této analýzy můžeme viděť, že náš odhad byl správný a frekvence +- odpovídají.
+Byl vygenerován signál obsahující pouze rušení složený z cosinusovek o frekvencích nalezených dříve pomocí funkce np.cos z knihovny numpy. Tento signál byl poté podroben spektrální analýze.
+Výsledný signál byl normalizován a byl vytvořen spektrogram a spektrální hustota tohoto signálu.
+Tento signál byl následně převeden na 16bit integer (pro uložení v 16bit wav) a uložen. Následně byl tento signál zobrazen v grafu.
 
 \begin{figure}[H] 
 	\centering
@@ -22,5 +23,3 @@ Z výskedků této analýzy můžeme viděť, že náš odhad byl správný a fr
 	\caption{Signál rušení}
 \end{figure}
 \end{landscape}
-
-Můžeme vidět že signál nevypadá úplně přesně jako ve vstupním signálu a je to tím, že neznáme jeho amplitudu a počáteční fázy.

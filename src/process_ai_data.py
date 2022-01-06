@@ -10,6 +10,10 @@ from pydub import AudioSegment
 import multiprocessing
 from functools import partial
 import os
+import librosa
+import librosa.display
+import scipy
+import matplotlib.pyplot as plt
 
 from helpers import *
 
@@ -30,19 +34,7 @@ def convert_all_files():
 
 def process_one_file(smpls, fs):
   # Split and normalize
-  try:
-    if smpls.shape[1] > 0:
-      normalized_samples = []
-
-      for i in range(smpls.shape[1]):
-        normalized_samples.extend(normalization(smpls[:, i]))
-
-      normalized_samples = np.array(normalized_samples)
-    else:
-      normalized_samples = normalization(smpls)
-  except Exception as e:
-    print(f"Exception on spliting data\n{e}")
-    normalized_samples = normalization(smpls)
+  normalized_samples = normalization(smpls)
 
   # Create noised data and normalize them
   noised_samples = noise_data(normalized_samples, fs)
@@ -53,10 +45,6 @@ def process_one_file(smpls, fs):
   noised_samples += 1
   normalized_samples = normalization(normalized_samples)
   noised_samples = normalization(noised_samples)
-
-  # Create frames
-  normalized_samples = create_frames(normalized_samples)
-  noised_samples = create_frames(noised_samples)
 
   return normalized_samples, noised_samples
 
@@ -69,8 +57,8 @@ def move_file(srcs, dest):
 
 def move_files(file_paths, target_path):
   try:
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-      p.map(partial(move_file, dest=target_path), [file_paths[(i * 100) : ((i * 100) + 100)] for i in range(math.ceil(len(file_paths) / 100))])
+    with multiprocessing.Pool(multiprocessing.cpu_count() * 2) as p:
+      p.map(partial(move_file, dest=target_path), [file_paths[(i * 20) : ((i * 20) + 20)] for i in range(math.ceil(len(file_paths) / 20))])
   except KeyboardInterrupt:
     pass
 
@@ -94,7 +82,9 @@ if __name__ == "__main__":
     print("Numbe of source files")
     print(len(file_paths))
 
-    for file_path in tqdm(file_paths, ncols=20):
+    window = scipy.signal.hamming(FRAME_SIZE, sym=False)
+
+    for file_path in tqdm(file_paths):
       cleaned_name = Path(file_path).name[:-4]
 
       if (any([cleaned_name in file_name for file_name in already_used_filenames]) or
@@ -102,7 +92,7 @@ if __name__ == "__main__":
         print(f"Skipping {cleaned_name}")
         continue
 
-      smpls, f = sf.read(file_path)
+      smpls, f = librosa.load(file_path, sr=MAX_SAMPLE_FREQUENCY, mono=True)
       gc.collect()
 
       print(f"Processing {cleaned_name}")
@@ -110,9 +100,27 @@ if __name__ == "__main__":
       random.seed()
       norm_s, nois_s = process_one_file(smpls, f)
 
-      for idx, (a, b) in enumerate(zip(norm_s, nois_s)):
+      data1 = librosa.stft(norm_s, n_fft=FRAME_SIZE, hop_length=FRAME_SIZE - FRAME_OVERLAP, window=window, center=True)
+      data2 = librosa.stft(nois_s, n_fft=FRAME_SIZE, hop_length=FRAME_SIZE - FRAME_OVERLAP, window=window, center=True)
+
+      # fig, ax = plt.subplots()
+      # img = librosa.display.specshow(librosa.amplitude_to_db(abs(data1), ref=np.max), y_axis='log', x_axis='time', ax=ax)
+      # ax.set_title('Power spectrogram')
+      # fig.colorbar(img, ax=ax, format="%+2.0f dB")
+      # plt.show()
+
+      # fig, ax = plt.subplots()
+      # img = librosa.display.specshow(librosa.amplitude_to_db(abs(data2), ref=np.max), y_axis='log', x_axis='time', ax=ax)
+      # ax.set_title('Power spectrogram')
+      # fig.colorbar(img, ax=ax, format="%+2.0f dB")
+      # plt.show()
+
+      for idx in range(data1.shape[1]):
         if not os.path.exists(f"tmp_dataset/{idx}_{cleaned_name}_{f}"):
-          np.save(f"tmp_dataset/{idx}_{cleaned_name}_{f}", np.array([a, b, np.fft.fft(b)[:(FRAME_SIZE//2)]], dtype=object))
+          ds = convert_imag_to_parts(data1[:, idx])
+          dn = convert_imag_to_parts(data2[:, idx])
+          np.save(f"tmp_dataset/{idx}_{cleaned_name}_{f}", np.array([ds, dn]))
+
       gc.collect()
 
   file_paths = []

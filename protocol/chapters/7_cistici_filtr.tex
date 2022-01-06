@@ -1,10 +1,23 @@
 \section{Čistící filtr}
 
-Byli navrženy 2 sady 4 filtrů typu pásmová zádrž na zablokování rušivých frekvencí (1 pro každou frekvenci).
+Byli navrženy 2 sady (byl otestován rozdíl mezi Elliptic a Butterworth filtrem) 4 filtrů typu pásmová zádrž na zablokování rušivých frekvencí (1 pro každou frekvenci).
 Dále byl proveden test odezvy na jednotkový skok a získány koeficienty jednotlivých filtrů.
 
+\subsection{Návrh filtrů}
+Pro návrh filtrů byla použita knihovna scipy, protože obsahuje funkce na jednoduchý návrh filtrů, které tento proces velmi usnadní.
+Tento proces je ze svou částí: část návrhu a část sestavení.
+V části návrhuje jsou návrhovou funkcí vytvořeny frekvenční požadavky na filtr (funkce ellipord a buttord). Výstup návrhové části je poté předán části sestavení (funkce ellip a butter), která vrátí koeficienty filtru.
+
+Návrové funkci se předávají frekvence v kterých má filtr operovat a vzhledem k povaze problému sestavený filtr bude pásmová zádrž pro každou z rušivých frekvencí, tak budou potřeba 2 sady frekvencí a to krajní frekvence zádržného pásma a frekvence propustného pásma.
+Frekvence zádržného pásma jsou v těsném okolí frekvence k blokování, v tomto případě frekvence blokování +-15Hz.
+Od frekvencí zádržného pásmo jsou poté odvozeny frekvence propustného pásma a budou +- 50Hz od frekvencí blokovacího pásma.
+Tyto frekvence je potřeba převést do rozmezí 0 - 1 a vydělením Nyquistovou frekvencí která je vzorkovací frekvence / 2.
+Tato funkce vrací stupeň filtru a pole frekvencí pro sestavení filtru.
+
+Hodnoty z předchozí funkce jsou předány funkci na sestavení filtru, dále je zvolen typ filtru a typ výstupu. Byl použit typ výstupu "sos" (second-order sections), protože eliminoval divné chování filtru v následujících krocích.
 
 \subsection{Koeficienty filtrů}
+Koeficienty byli získány funkcí "signal.sos2tf" pro převední formátu "sos" na formát "b, a" a tyto hodnoty byli poté vypsány.
 
 \subsubsection{Elliptic filtr}
 \noindent
@@ -49,6 +62,9 @@ b: [0.9357501935127109, -2.260869775217778, 5.791436954960856, -7.60748179695837
 a: [1.0, -2.3759997500692154, 5.984420346345581, -7.731224336253958, 9.830303893877872, -7.478753316838797, 5.599956259229786, -2.1507257411903207, 0.875628424659228]\\
 
 \subsection{Odezva na jednotkový skok}
+Nejdříve byl vytvořen jednotkový skok a to vytvořením pole nul o délce 256 vzorků a na první vzorek byla umístěna 1.
+Poté byla na tomto signálu provedena filtrace pomocí dříve vytvořených filtrů a funkce "signal.sosfilt", která má jako první argument data filtru a signál.
+Výstup této funkce byl vykreslen pomocí funkce "plt.stem" a číslem vzorku na x ose.
 
 \subsubsection{Elliptic filtr}
 

@@ -2,3 +2,5 @@ scipy
 soundfile
 numpy
 matplotlib
+librosa
+tensorflow

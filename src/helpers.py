@@ -5,12 +5,14 @@ from itertools import repeat
 from collections import deque
 import threading
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, Model, callbacks, initializers
+import multiprocessing
+from tensorflow.keras import callbacks
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import time
 import random
 import json
+from typing import Union
 
 from settings import *
 
@@ -51,6 +53,9 @@ def find_files(files, dirs=[], extensions=[]):
 
 def normalization(samples:np.ndarray):
     smpl = samples.copy()
+
+    smpl = smpl - np.mean(smpl)
+
     max_abs_val = max(abs(smpl))
 
     # Normalization
@@ -58,21 +63,27 @@ def normalization(samples:np.ndarray):
     return smpl
 
 def convert_imag_to_parts(array:np.ndarray):
-    tmp = np.empty((array.shape[0], 2))
+    tmp = np.empty((2, array.shape[0]))
 
     for idx, a in enumerate(array):
-        tmp[idx][0] = a.real
-        tmp[idx][1] = a.imag
+        tmp[0][idx] = np.abs(a)
+        tmp[1][idx] = np.angle(a)
 
-    return np.reshape(np.nan_to_num(tmp), (array.shape[0] * 2,))
+    return tmp
 
-def data_generation(files, batch_size, dim):
+def convert_parts_to_complex(array:np.ndarray):
+    tmp = np.empty((array.shape[1],))
+
+    for idx in range(array.shape[0]):
+        tmp[idx] = array[0][idx] * np.exp(1j*array[1][idx])
+
+    return tmp
+
+def data_generation(files, batch_size):
   try:
     # Initialization
-    X = np.empty((batch_size, *dim))
-    fft = np.empty((batch_size, *dim))
-    f = np.empty((batch_size), dtype=float)
-    y = np.empty((batch_size, *dim))
+    X = np.empty((batch_size, 2, FRAME_SIZE - FRAME_OVERLAP + 2))
+    y = np.empty((batch_size, 2, FRAME_SIZE - FRAME_OVERLAP + 2))
 
         # Generate data
     for idx, file in enumerate(files):
@@ -81,26 +92,24 @@ def data_generation(files, batch_size, dim):
         try:
             loaded_data = np.load(file, allow_pickle=True)
 
-            X[idx,] = loaded_data[1].real
-            fft[idx,] = convert_imag_to_parts(loaded_data[2])
-            f[idx] = freq / MAX_SAMPLE_FREQUENCY
-            y[idx,] = loaded_data[0].real
+            X[idx,] = np.pad(loaded_data[1], ((0, 0), (0, (FRAME_SIZE - FRAME_OVERLAP + 2) - loaded_data[1].shape[1])), "constant")
+            y[idx,] = np.pad(loaded_data[0], ((0, 0), (0, (FRAME_SIZE - FRAME_OVERLAP + 2) - loaded_data[0].shape[1])), "constant")
         except Exception as e:
             print(f"[WARNING] Failed to create new batch\n{e}")
             return None
 
-    return [X, fft, f], y
+    return X, y
   except KeyboardInterrupt:
     return None
 
 class DataGenerator(keras.utils.Sequence, threading.Thread):
-    def __init__(self, path, dim, batch_size=32, shuffle=True):
+    def __init__(self, path, batch_size=32, preload_size=64, workers:Union[None, int]=None, shuffle=True):
         super(DataGenerator, self).__init__()
-        self.executor = concurrent.futures.ProcessPoolExecutor(8)
+        self.executor = concurrent.futures.ProcessPoolExecutor(multiprocessing.cpu_count() if workers is None else workers)
         self.__terminate = False;
 
-        self.dim = dim
         self.files = []
+        self.preload_size = preload_size
         find_files(self.files, dirs=[path], extensions=[".npy"])
 
         self.batch_size = batch_size
@@ -126,10 +135,10 @@ class DataGenerator(keras.utils.Sequence, threading.Thread):
         while True:
           if self.__terminate: break
 
-          if len(self.queue) < 20:
-            batches = [self.get_batch_of_paths() for _ in range(20)]
+          if len(self.queue) < self.preload_size:
+            batches = [self.get_batch_of_paths() for _ in range(self.preload_size)]
               
-            return_data = self.executor.map(data_generation, batches, repeat(self.batch_size), repeat(self.dim))
+            return_data = self.executor.map(data_generation, batches, repeat(self.batch_size))
 
             for ret_dat in return_data:
               if ret_dat is not None:
@@ -252,56 +261,3 @@ def noiseToSignalLoss(y_true, y_pred):
 
 def SNR(y_true, y_pred):
   return -10.0 * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.0)
-
-def create_model(default_filter_size, number_of_layers, double_layers=False, lr=1e-4):
-  inp1 = layers.Input(shape=(FRAME_SIZE,), name="frame_input")
-  inp2 = layers.Input(shape=(FRAME_SIZE,), name="fft_input")
-  inp3 = layers.Input(shape=(1,), name="frequency_input")
-
-  x = layers.Concatenate(name="data_conc")([inp1, inp2])
-
-  y = layers.Dense(64, name="freq_dense")(inp3)
-  y = layers.LeakyReLU(0.2, name="freq_activation")(y)
-  y = layers.Dropout(0.1, name="freq_dropout")(y)
-
-  x = layers.Concatenate(name="freq_data_conc")([x, y])
-
-  first_stage_layers = []
-  for i in range(number_of_layers):
-    x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"down_dense_{i}")(x)
-    x = layers.LeakyReLU(0.2, name=f"down_dense_activation_{i}")(x)
-    x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"down_dense_batchnorm_{i}")(x)
-
-    if i == 0:
-      x = layers.Dropout(0.1, name=f"down_dense_dropout_{i}")(x)
-    first_stage_layers.append(x)
-
-    if double_layers:
-      x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"down_dense_{i}d")(x)
-      x = layers.LeakyReLU(0.2, name=f"down_dense_activation_{i}d")(x)
-      x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"down_dense_batchnorm_{i}d")(x)
-
-    default_filter_size /= 2
-
-  for i, layer in enumerate(reversed(first_stage_layers)):
-    default_filter_size *= 2
-    
-    x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"up_dense_{i}")(x)
-    x = layers.LeakyReLU(0.2, name=f"up_dense_activation_{i}")(x)
-    x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"up_dense_batchnorm_{i}")(x)
-
-    x = layers.Add(name=f"skip_add_{i}")([x, layer])
-
-    if double_layers:
-      x = layers.Dense(default_filter_size, kernel_initializer=initializers.RandomNormal(stddev=0.02), name=f"down_dense_{i}u")(x)
-      x = layers.LeakyReLU(0.2, name=f"down_dense_activation_{i}u")(x)
-      x = layers.BatchNormalization(axis=1, momentum=0.6, name=f"down_dense_batchnorm_{i}u")(x)
-
-  x = layers.Dense(FRAME_SIZE, name="output")(x)
-
-  model = Model([inp1, inp2, inp3], x)
-  
-  model.compile(optimizer=optimizers.Adam(lr, 0.5), loss=noiseToSignalLoss, metrics=["mse", SNR])
-  # model.compile(optimizer=optimizers.Adam(lr), loss="mse", metrics=[SNR])
-
-  return model

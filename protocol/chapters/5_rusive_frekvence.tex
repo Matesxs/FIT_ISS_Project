@@ -4,6 +4,10 @@
 Z grafů výše můžeme vidět, že peaky rušení jsou +- stejně daleko od sebe, takže můžeme říci že jsou harmonicky vztažené neboli, že frekvence rušení 2., 3., 4., jsou násobky 1.
 Z FFT grafu z úlohy 3 můžeme odečíst hodnoty frekvencí peaků, které jsou 3223, 2423, 1615 a 800 Hz.
 Dále byla naprogramována funkce na získání frekvencí rušení z výkonové spektrální hustoty.
+Funkce má argumenty signál z kterého chceme peaky získat (například spektrální hustota), pole korespondujících frekvencí, počet peaků které chceme najít a šířku pásma v kterém se už nebude hledat kolem peaků.
+Potom se podle počtu peaků cyklí a na začátku cyklu získáme index s nejvyšší hodnotou ve vstupním signálu a hledá se k němu korespondující frekvence v poli frekvencí a uloží se do výstupního pole.
+Poté se odstraní ze vstupního signálu hodnoty v okolí nalezeného peaku (i s daným peakem) a cyklus začíná od začátku.
+
 Funkce vrátila hodnoty 812.5, 1609.375, 2421.875 a 3218.75 Hz.
 Tyto hodnoty se velmi blíží těm co byli odečteny z grafu, takže funkce funguje správně.
 Dále můžeme vidět, že tyto frekvence jsou opravdu skoro násobky nejnižší frekvence rušení, je zde ale malá nepřesnost způsobená nejspíš malou vzorkovací frekvencí signálu a tím pádem jeho zkreslením.
